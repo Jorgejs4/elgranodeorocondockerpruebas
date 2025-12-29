@@ -1,0 +1,9 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* Opcional: Para asegurar que el fondo negro cubra todo si hay poco contenido */
+body, html {
+  height: 100%;
+  background-color: #09090b; /* Zinc-950 */
+}

@@ -1,0 +1,31 @@
+# Entorno Python
+venv/
+__pycache__/
+node_modules/
+
+# Archivos de Seguridad y Datos
+.env
+*.pkl
+.*pyc
+
+# Carpetas de Entorno Comunes (AGREGAR ESTO)
+.vscode/
+.idea/
+.DS_Store
+*.log
+
+# Archivos de sistema y entorno
+__pycache__/
+*.pyc
+.env
+venv/
+.vscode/
+
+# Docker y Base de datos
+pg_data/
+db_data/
+*.log
+
+
+# Backend
+backend/__pycache__/
