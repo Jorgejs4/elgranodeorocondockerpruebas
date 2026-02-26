@@ -400,3 +400,22 @@ def get_admin_orders(db: Session = Depends(get_db), admin: models.User = Depends
         "address": o.address,
         "status": o.status
     } for o in orders]
+
+
+
+from pydantic import BaseModel
+
+class InteractionSchema(BaseModel):
+    product_id: int = None
+    action_type: str
+
+@app.post("/track", tags=["Analytics"])
+def track_interaction(interaction: InteractionSchema, user_id: int = None, db: Session = Depends(get_db)):
+    db_interaction = models.Interaction(
+        user_id=user_id,
+        product_id=interaction.product_id,
+        action_type=interaction.action_type
+    )
+    db.add(db_interaction)
+    db.commit()
+    return {"status": "tracked"}

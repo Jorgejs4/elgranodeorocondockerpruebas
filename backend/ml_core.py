@@ -81,3 +81,47 @@ def get_popular_products(db, n=4):
         return [p.id for p in db.query(models.Product.id).limit(n).all()]
         
     return [p[0] for p in popular_ids]
+
+
+from sqlalchemy.orm import Session
+import pandas as pd
+import models
+
+def generate_business_insights(db: Session):
+    # Obtener todas las interacciones
+    interactions = db.query(models.Interaction).all()
+    if not interactions:
+        return {"mensaje": "Aún no hay suficientes datos para analizar."}
+    
+    # Convertir a DataFrame de Pandas para analizar fácilmente
+    data = []
+    for i in interactions:
+        data.append({
+            "action": i.action_type,
+            "product_id": i.product_id,
+            "hour": i.timestamp.hour,
+            "day": i.timestamp.weekday() # 0 = Lunes, 6 = Domingo
+        })
+    df = pd.DataFrame(data)
+    
+    # --- CONCLUSIONES AUTOMÁTICAS ---
+    
+    # 1. ¿A qué hora compra más la gente?
+    purchases = df[df['action'] == 'purchase']
+    best_hour = purchases['hour'].mode()[0] if not purchases.empty else "No hay compras"
+    
+    # 2. Producto más visto
+    views = df[df['action'] == 'view']
+    most_viewed_id = views['product_id'].mode()[0] if not views.empty else None
+    
+    # 3. Tasa de conversión (Vistos vs Comprados)
+    total_views = len(views)
+    total_purchases = len(purchases)
+    conversion_rate = (total_purchases / total_views * 100) if total_views > 0 else 0
+    
+    return {
+        "hora_pico_ventas": int(best_hour) if isinstance(best_hour, (int, float)) else best_hour,
+        "producto_mas_visitado_id": int(most_viewed_id) if most_viewed_id else None,
+        "tasa_conversion": round(conversion_rate, 2),
+        "consejo_ia": f"Tus clientes interactúan más a las {best_hour}:00. Te sugiero enviar correos promocionales 1 hora antes." if isinstance(best_hour, (int, float)) else "Necesitamos más datos."
+    }

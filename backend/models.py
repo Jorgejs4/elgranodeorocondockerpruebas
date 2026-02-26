@@ -59,3 +59,12 @@ class Order(Base):
     items_summary = Column(String)  # Guardaremos "2x Café, 1x Prensa"
     address = Column(String)
     status = Column(String, default="pending") # pending, shipped
+
+
+class Interaction(Base):
+    __tablename__ = "interactions"
+    id = Column(Integer, primary_key=True, index=True)
+    user_id = Column(Integer, nullable=True) # Puede ser un visitante anónimo
+    product_id = Column(Integer, nullable=True)
+    action_type = Column(String) # Ej: "view", "click", "add_to_cart", "purchase"
+    timestamp = Column(DateTime(timezone=True), server_default=func.now())

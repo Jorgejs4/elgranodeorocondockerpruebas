@@ -6,10 +6,10 @@ const API_BASE_URL = 'https://grano-oro-api.onrender.com';
 
 // --- COMPONENTE DE GRÁFICO PERSONALIZADO (SVG) ---
 const SalesChart = ({ orders }) => {
-  // SEGURIDAD: Evitar que el gráfico rompa la app si no hay pedidos válidos
-  if (!Array.isArray(orders)) return null;
-
+  // 1. El Hook siempre debe ir antes de cualquier 'return' o 'if'
   const data = useMemo(() => {
+    if (!Array.isArray(orders)) return []; // Si no hay pedidos, devolvemos array vacío
+    
     const days = [];
     const today = new Date();
     for (let i = 6; i >= 0; i--) {
@@ -25,6 +25,9 @@ const SalesChart = ({ orders }) => {
     }
     return days;
   }, [orders]);
+
+  // 2. AHORA SÍ hacemos el return de seguridad
+  if (!Array.isArray(orders) || orders.length === 0) return null;
 
   const maxVal = Math.max(...data.map(d => d.val), 100);
   
@@ -219,7 +222,7 @@ function App() {
 
         if (!response.ok) throw new Error("Error al procesar el stock en el servidor");
 
-        const data = await response.json();
+        await response.json();
         
         alert(`🎉 ¡Pedido confirmado y stock actualizado!`);
         setCart([]);
@@ -461,8 +464,8 @@ function App() {
                               <div key={order.id} className="p-4 bg-black/40 rounded-xl border border-zinc-800 flex justify-between items-center">
                                  <div>
                                     <p className="text-white font-bold">Pedido #{order.id}</p>
-                                    <p className="text-sm text-zinc-400">{order.items || order.items_summary}</p>
-                                    <p className="text-xs text-zinc-500 italic">{order.user} - {order.address}</p>
+                                    <p className="text-sm text-zinc-400">{order.items_summary || order.items}</p>
+                                    <p className="text-xs text-zinc-500 italic">{order.user_email || order.user} - {order.address}</p>
                                  </div>
                                  <button 
                                     onClick={() => handleShipOrder(order.id)}
