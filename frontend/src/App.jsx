@@ -5,49 +5,35 @@ import { Routes, Route, Link, useNavigate, useParams, useLocation } from 'react-
 const API_BASE_URL = 'https://grano-oro-api.onrender.com';
 
 // --- COMPONENTE TRADUCTOR GOOGLE ---
+// --- COMPONENTE TRADUCTOR GOOGLE ---
 const GoogleTranslate = () => {
-  useEffect(() => {
-    // Evitar duplicados
-    if (window.google?.translate?.TranslateElement) return;
-
-    const addScript = document.createElement('script');
-    addScript.src = '//translate.google.com/translate_a/element.js?cb=googleTranslateElementInit';
-    addScript.async = true;
-    document.body.appendChild(addScript);
-
-    window.googleTranslateElementInit = () => {
-      new window.google.translate.TranslateElement({
-        pageLanguage: 'es',
-        layout: window.google.translate.TranslateElement.InlineLayout.SIMPLE,
-        autoDisplay: false
-      }, 'google_translate_element');
-    };
-  }, []);
-
   return (
-    <div className="flex items-center">
-      <div id="google_translate_element" className="google-translate-container"></div>
+    <div className="flex items-center mt-1 mr-4">
+      {/* Este es el cajón vacío que el script del HTML va a llenar */}
+      <div id="google_translate_element" className="overflow-hidden rounded-full border border-zinc-700 h-8 flex items-center bg-zinc-900/80"></div>
+      
+      {/* CSS para hacerlo bonito y que parezca parte de tu menú */}
       <style>{`
-        .google-translate-container .goog-te-gadget-simple {
+        .goog-te-gadget-simple {
           background-color: transparent !important;
-          border: 1px solid #3f3f46 !important;
-          padding: 4px 8px !important;
-          border-radius: 20px !important;
-          font-size: 12px !important;
+          border: none !important;
+          padding: 0px 10px !important;
+          font-size: 13px !important;
           display: flex;
           align-items: center;
-          color: #d4d4d8 !important;
+          height: 100%;
         }
-        .google-translate-container .goog-te-gadget-simple a {
+        .goog-te-gadget-simple a {
              color: #d4d4d8 !important;
              font-weight: bold;
+             text-decoration: none !important;
         }
-        .google-translate-container .goog-te-gadget-simple span {
-             color: #d4d4d8 !important;
-        }
+        .goog-te-gadget-simple span { color: #f59e0b !important; }
         .goog-te-gadget img { display: none !important; }
         .goog-te-banner-frame { display: none !important; }
+        .goog-te-menu-value { display: flex; align-items: center; gap: 5px; margin: 0; }
         body { top: 0 !important; }
+        #goog-gt-tt { display: none !important; }
       `}</style>
     </div>
   );
