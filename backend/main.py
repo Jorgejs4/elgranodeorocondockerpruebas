@@ -419,3 +419,10 @@ def track_interaction(interaction: InteractionSchema, user_id: int = None, db: S
     db.add(db_interaction)
     db.commit()
     return {"status": "tracked"}
+
+# Al final de backend/main.py
+@app.get("/admin/ai-insights", tags=["Admin"])
+def get_ai_insights(db: Session = Depends(get_db)):
+    # Importamos la función que escribimos antes en ml_core
+    from ml_core import generate_business_insights
+    return generate_business_insights(db)
