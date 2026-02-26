@@ -4,37 +4,48 @@ import { Routes, Route, Link, useNavigate, useParams, useLocation } from 'react-
 // --- CONFIGURACIÓN DE URL ---
 const API_BASE_URL = 'https://grano-oro-api.onrender.com';
 
-// --- COMPONENTE TRADUCTOR GOOGLE ---
-// --- COMPONENTE TRADUCTOR GOOGLE ---
-const GoogleTranslate = () => {
+// --- NUEVO TRADUCTOR (Desplegable nativo y elegante) ---
+const LanguageSelector = () => {
+  const getCookie = (name) => {
+    const value = `; ${document.cookie}`;
+    const parts = value.split(`; ${name}=`);
+    if (parts.length === 2) return parts.pop().split(';').shift();
+    return null;
+  };
+
+  const currentLang = getCookie('googtrans')?.split('/').pop() || 'es';
+
+  const handleLanguageChange = (e) => {
+    const lang = e.target.value;
+    if (lang === 'es') {
+      // Si vuelve a español, borramos la cookie de Google
+      document.cookie = `googtrans=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/;`;
+      document.cookie = `googtrans=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/; domain=.${window.location.hostname}`;
+    } else {
+      // Forzamos la cookie de traducción al nuevo idioma
+      document.cookie = `googtrans=/es/${lang}; path=/;`;
+      document.cookie = `googtrans=/es/${lang}; path=/; domain=.${window.location.hostname}`;
+    }
+    window.location.reload(); // Recarga para aplicar traducción
+  };
+
   return (
-    <div className="flex items-center mt-1 mr-4">
-      {/* Este es el cajón vacío que el script del HTML va a llenar */}
-      <div id="google_translate_element" className="overflow-hidden rounded-full border border-zinc-700 h-8 flex items-center bg-zinc-900/80"></div>
-      
-      {/* CSS para hacerlo bonito y que parezca parte de tu menú */}
-      <style>{`
-        .goog-te-gadget-simple {
-          background-color: transparent !important;
-          border: none !important;
-          padding: 0px 10px !important;
-          font-size: 13px !important;
-          display: flex;
-          align-items: center;
-          height: 100%;
-        }
-        .goog-te-gadget-simple a {
-             color: #d4d4d8 !important;
-             font-weight: bold;
-             text-decoration: none !important;
-        }
-        .goog-te-gadget-simple span { color: #f59e0b !important; }
-        .goog-te-gadget img { display: none !important; }
-        .goog-te-banner-frame { display: none !important; }
-        .goog-te-menu-value { display: flex; align-items: center; gap: 5px; margin: 0; }
-        body { top: 0 !important; }
-        #goog-gt-tt { display: none !important; }
-      `}</style>
+    <div className="relative flex items-center mr-4">
+      <span className="text-xl mr-2">🌐</span>
+      <select 
+        className="bg-zinc-900 text-zinc-300 text-sm font-bold border border-zinc-700 rounded-lg px-3 py-1.5 outline-none cursor-pointer hover:border-amber-500 transition-colors shadow-lg"
+        value={currentLang}
+        onChange={handleLanguageChange}
+      >
+        <option value="es">Español</option>
+        <option value="en">English</option>
+        <option value="fr">Français</option>
+        <option value="de">Deutsch</option>
+        <option value="it">Italiano</option>
+        <option value="zh-CN">中文</option>
+      </select>
+      {/* Escondemos el feo widget original de Google */}
+      <div id="google_translate_element" className="hidden"></div>
     </div>
   );
 };
@@ -93,9 +104,7 @@ const ProductDetailWrapper = ({ products, addToCart, buyNow, toggleWishlist, wis
   const navigate = useNavigate();
   const product = products.find(p => p.id === parseInt(id));
 
-  useEffect(() => {
-    window.scrollTo(0, 0);
-  }, [id]);
+  useEffect(() => { window.scrollTo(0, 0); }, [id]);
 
   if (!product) return <div className="text-white text-center mt-20">Cargando o producto no encontrado...</div>;
 
@@ -115,13 +124,10 @@ const ProductDetailWrapper = ({ products, addToCart, buyNow, toggleWishlist, wis
                     </div>
                 </div>
                 <div className="text-4xl font-light text-white border-b border-zinc-800 pb-6">{product.price}€<span className="text-sm font-normal text-zinc-500 ml-2">IVA incluido</span></div>
-                <div className="bg-zinc-900/50 p-6 rounded-2xl border border-zinc-800 space-y-4">
-                    <div className="flex items-center gap-4"><span className="text-2xl bg-zinc-800 p-2 rounded-lg">🚚</span><div><p className="font-bold text-white">Entrega Estimada</p><p className="text-sm text-green-400">Llega pronto</p></div></div>
-                </div>
                 <p className="text-zinc-300 leading-relaxed text-lg">{product.description}</p>
                 <div className="flex gap-4 mt-4">
-                    <button onClick={() => addToCart(product)} className="flex-1 bg-zinc-800 text-white font-bold py-4 rounded-xl border border-zinc-700 hover:bg-zinc-700 hover:border-amber-500 transition">Añadir a la Cesta</button>
-                    <button onClick={() => buyNow(product)} className="flex-1 bg-gradient-to-r from-amber-600 to-yellow-500 text-black font-bold py-4 rounded-xl hover:opacity-90 shadow-lg transition">Comprar Ahora</button>
+                    <button onClick={() => addToCart(product)} disabled={product.stock <= 0} className={`flex-1 font-bold py-4 rounded-xl border transition ${product.stock > 0 ? 'bg-zinc-800 text-white border-zinc-700 hover:bg-zinc-700 hover:border-amber-500' : 'bg-zinc-900 text-zinc-600 border-zinc-800 cursor-not-allowed'}`}>Añadir a la Cesta</button>
+                    <button onClick={() => buyNow(product)} disabled={product.stock <= 0} className={`flex-1 font-bold py-4 rounded-xl shadow-lg transition ${product.stock > 0 ? 'bg-gradient-to-r from-amber-600 to-yellow-500 text-black hover:opacity-90' : 'bg-zinc-800 text-zinc-600 cursor-not-allowed'}`}>Comprar Ahora</button>
                     <button onClick={() => toggleWishlist(product)} className={`w-16 flex items-center justify-center rounded-xl border transition ${wishlist.find(w=>w.id===product.id) ? 'bg-amber-900/20 border-amber-500 text-amber-500' : 'bg-zinc-900 border-zinc-700 text-zinc-400 hover:text-white'}`}><span className="text-2xl">♥</span></button>
                 </div>
             </div>
@@ -156,65 +162,48 @@ function App() {
   const [savedCards] = useState([{ id: 1, last4: '4242', brand: 'Visa' }]);
   const [useNewCard, setUseNewCard] = useState(false);
 
-  // Rastreo de interacciones (TRACKING)
+  // Tracking
   useEffect(() => {
-    // Si estamos viendo un producto, enviamos tracking
     if (location.pathname.startsWith('/product/')) {
        const prodId = location.pathname.split('/')[2];
        if(prodId && !isNaN(prodId)) {
-          // Enviar "view" al backend
           fetch(`${API_BASE_URL}/track`, {
-             method: 'POST',
-             headers: { 'Content-Type': 'application/json' },
+             method: 'POST', headers: { 'Content-Type': 'application/json' },
              body: JSON.stringify({ product_id: parseInt(prodId), action_type: 'view' })
           }).catch(err => console.log("Tracking error:", err));
        }
     }
   }, [location]);
 
-  // Carga de datos
   useEffect(() => {
     let isMounted = true;
     const loadData = async () => {
       try {
         const res = await fetch(`${API_BASE_URL}/products/?skip=0&limit=100`);
         const data = await res.json();
-        
         let urlRec = `${API_BASE_URL}/recommendations/`;
         if (user?.id) urlRec += `?user_id=${user.id}`;
         const resRec = await fetch(urlRec);
         const recData = resRec.ok ? await resRec.json() : [];
-
-        if (isMounted) {
-            setProducts(Array.isArray(data) ? data : []);
-            setRecommendations(Array.isArray(recData) ? recData : []);
-        }
-      } catch (err) { console.error("Error cargando productos:", err); }
+        if (isMounted) { setProducts(Array.isArray(data) ? data : []); setRecommendations(Array.isArray(recData) ? recData : []); }
+      } catch (err) { console.error(err); }
     };
     loadData();
     return () => { isMounted = false; };
   }, [user]);
 
-  // Carga de pedidos admin e insights
   useEffect(() => {
     if (user && user.role === 'admin' && location.pathname === '/admin') {
       const fetchOrders = async () => {
         try {
-          const res = await fetch(`${API_BASE_URL}/admin/orders`, {
-            headers: { 'Authorization': `Bearer ${user.token}` }
-          });
+          const res = await fetch(`${API_BASE_URL}/admin/orders`, { headers: { 'Authorization': `Bearer ${user.token}` } });
           const data = await res.json();
           setOrders(Array.isArray(data) ? data : []);
           
-          // Cargar IA Insights
           const resAi = await fetch(`${API_BASE_URL}/admin/ai-insights`, { headers: { 'Authorization': `Bearer ${user.token}` } });
           const dataAi = await resAi.json();
           setAiInsights(dataAi);
-          
-        } catch (err) { 
-          console.error("Error admin data:", err);
-          setOrders([]); 
-        }
+        } catch (err) { console.error(err); setOrders([]); }
       };
       fetchOrders();
     }
@@ -224,13 +213,7 @@ function App() {
     const exist = cart.find(x => x.id === product.id);
     if (exist) setCart(cart.map(x => x.id === product.id ? { ...exist, qty: exist.qty + 1 } : x));
     else setCart([...cart, { ...product, qty: 1 }]);
-    
-    // Tracking add_to_cart
-    fetch(`${API_BASE_URL}/track`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ product_id: product.id, action_type: 'add_to_cart' })
-    }).catch(e=>console.log(e));
+    fetch(`${API_BASE_URL}/track`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ product_id: product.id, action_type: 'add_to_cart' })}).catch(e=>console.log(e));
   };
 
   const removeFromCart = (product) => {
@@ -247,8 +230,7 @@ function App() {
 
   const buyNow = (product) => { 
     setCart([{ ...product, qty: 1 }]); 
-    if (!user) { setShowAuth(true); } 
-    else { navigate("/checkout"); }
+    if (!user) { setShowAuth(true); } else { navigate("/checkout"); }
   };
 
   const handleCreateProduct = async (e) => {
@@ -258,22 +240,31 @@ function App() {
       newProd.price = parseFloat(newProd.price);
       newProd.stock = parseInt(newProd.stock); 
       try {
-        const res = await fetch(`${API_BASE_URL}/products/`, { 
-          method: 'POST', 
-          headers: {'Content-Type': 'application/json'}, 
-          body: JSON.stringify(newProd) 
-        });
+        const res = await fetch(`${API_BASE_URL}/products/`, { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify(newProd) });
         if(res.ok) {
             const saved = await res.json();
             setProducts(prev => [...prev, saved]);
-            e.target.reset();
-            alert("Producto creado");
+            e.target.reset(); alert("Producto creado");
         }
       } catch (err) { console.error(err); }
   };
   
+  const handleUpdateStock = async (id, newStock) => {
+      try {
+          const res = await fetch(`${API_BASE_URL}/admin/products/${id}/stock`, {
+              method: 'PUT',
+              headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${user.token}` },
+              body: JSON.stringify({ stock: parseInt(newStock) })
+          });
+          if(res.ok) {
+              setProducts(products.map(p => p.id === id ? {...p, stock: parseInt(newStock)} : p));
+              alert("✅ Stock actualizado correctamente");
+          }
+      } catch(err) { console.error(err); }
+  };
+
   const handleDeleteProduct = async (id) => {
-      if(window.confirm("¿Eliminar permanentemente?")) {
+      if(window.confirm("¿Estás seguro de que quieres eliminar este producto? Se borrará para siempre.")) {
           try {
             const res = await fetch(`${API_BASE_URL}/products/${id}`, { method: 'DELETE' });
             if (res.ok) setProducts(prev => prev.filter(p => p.id !== id));
@@ -283,10 +274,7 @@ function App() {
 
   const handleShipOrder = async (orderId) => {
     try {
-        const res = await fetch(`${API_BASE_URL}/admin/orders/${orderId}/ship`, {
-            method: 'PUT',
-            headers: { 'Authorization': `Bearer ${user.token}` }
-        });
+        const res = await fetch(`${API_BASE_URL}/admin/orders/${orderId}/ship`, { method: 'PUT', headers: { 'Authorization': `Bearer ${user.token}` } });
         if (res.ok) {
             setOrders(prev => prev.map(o => o.id === orderId ? {...o, status: 'shipped'} : o));
             alert("📦 Pedido marcado como enviado");
@@ -298,21 +286,12 @@ function App() {
     e.preventDefault();
     if(cart.length === 0) return;
     
-    // Tracking purchase attempt
-    cart.forEach(item => {
-        fetch(`${API_BASE_URL}/track`, {
-            method: 'POST', headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ product_id: item.id, action_type: 'purchase' })
-        }).catch(e=>console.log(e));
-    });
+    cart.forEach(item => { fetch(`${API_BASE_URL}/track`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ product_id: item.id, action_type: 'purchase' })}).catch(e=>console.log(e)); });
 
     try {
         const response = await fetch(`${API_BASE_URL}/checkout`, {
             method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-                'Authorization': `Bearer ${user.token}`
-            },
+            headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${user.token}` },
             body: JSON.stringify({
                 user: user.email,
                 items: cart.map(item => ({ id: item.id, name: item.name, qty: item.qty, price: item.price })),
@@ -321,29 +300,28 @@ function App() {
             })
         });
 
-        if (!response.ok) throw new Error("Error al procesar el stock en el servidor");
-        await response.json(); // Consumir respuesta
+        if (!response.ok) throw new Error("Error procesando pago");
+        await response.json(); 
         
         alert(`🎉 ¡Pedido confirmado y stock actualizado!`);
-        setCart([]);
-        navigate("/");
-        window.scrollTo(0,0);
+        setCart([]); navigate("/"); window.scrollTo(0,0);
         
-        // Recargar productos
         const resProd = await fetch(`${API_BASE_URL}/products/`);
         const updatedProds = await resProd.json();
         setProducts(updatedProds);
 
-    } catch (err) {
-        console.error(err);
-        alert("Hubo un problema con la base de datos de stock.");
-    }
+    } catch (err) { console.error(err); alert("Hubo un problema con la transacción."); }
   };
 
-  const filteredProducts = products
-    .filter(p => p.name.toLowerCase().includes(search.toLowerCase()))
-    .filter(p => category === "all" || p.category === category);
-  
+  // Cálculos de ventas
+  const today = new Date();
+  const salesToday = orders.filter(o => o.date && new Date(o.date).toDateString() === today.toDateString()).reduce((acc, curr) => acc + (curr.total || 0), 0);
+  const startOfWeek = new Date(today); startOfWeek.setDate(today.getDate() - today.getDay());
+  const salesWeek = orders.filter(o => o.date && new Date(o.date) >= startOfWeek).reduce((acc, curr) => acc + (curr.total || 0), 0);
+  const salesMonth = orders.filter(o => o.date && new Date(o.date).getMonth() === today.getMonth() && new Date(o.date).getFullYear() === today.getFullYear()).reduce((acc, curr) => acc + (curr.total || 0), 0);
+  const salesYear = orders.filter(o => o.date && new Date(o.date).getFullYear() === today.getFullYear()).reduce((acc, curr) => acc + (curr.total || 0), 0);
+
+  const filteredProducts = products.filter(p => p.name.toLowerCase().includes(search.toLowerCase())).filter(p => category === "all" || p.category === category);
   const cartTotal = cart.reduce((acc, item) => acc + item.price * item.qty, 0);
 
   return (
@@ -353,18 +331,14 @@ function App() {
         <div className="max-w-7xl mx-auto px-4">
           <div className="flex items-center justify-between h-20">
             <Link to="/" className="flex items-center gap-2" onClick={() => setSearch("")}>
-              <h1 className="text-2xl font-serif font-bold bg-gradient-to-r from-amber-400 to-yellow-600 bg-clip-text text-transparent">
-                El Grano de Oro
-              </h1>
+              <h1 className="text-2xl font-serif font-bold bg-gradient-to-r from-amber-400 to-yellow-600 bg-clip-text text-transparent">El Grano de Oro</h1>
             </Link>
-            <div className="flex items-center gap-4">
-               {/* TRADUCTOR INTEGRADO EN MENU */}
-               <GoogleTranslate />
+            <div className="flex items-center gap-2 md:gap-4">
+               
+               <LanguageSelector />
 
                {user && user.role === 'admin' && (
-                 <Link to="/admin" className="hidden md:block px-4 py-2 text-sm font-bold text-amber-500 border border-amber-500/50 rounded-full hover:bg-amber-500 hover:text-black transition-all">
-                   ⚙️ Panel Admin
-                 </Link>
+                 <Link to="/admin" className="hidden md:block px-4 py-2 text-sm font-bold text-amber-500 border border-amber-500/50 rounded-full hover:bg-amber-500 hover:text-black transition-all">⚙️ Panel Admin</Link>
                )}
                <Link to="/wishlist" className="relative cursor-pointer group p-2">
                  <span className={`text-2xl transition ${wishlist.length > 0 ? 'text-amber-500' : 'text-zinc-300 group-hover:text-amber-400'}`}>♥</span>
@@ -375,11 +349,7 @@ function App() {
                  {cart.length > 0 && <span className="absolute top-0 right-0 bg-amber-600 text-white text-xs font-bold w-4 h-4 flex items-center justify-center rounded-full animate-bounce">{cart.reduce((a,c)=>a+c.qty,0)}</span>}
                </Link>
                {user ? (
-                 <button onClick={() => {
-                     setUser(null); 
-                     localStorage.removeItem('user'); 
-                     navigate("/");
-                 }} className="text-xs font-bold text-zinc-400 hover:text-amber-500 ml-4 uppercase tracking-wider transition border-l border-zinc-700 pl-4">CERRAR SESIÓN</button>
+                 <button onClick={() => { setUser(null); localStorage.removeItem('user'); navigate("/"); }} className="text-xs font-bold text-zinc-400 hover:text-amber-500 ml-2 md:ml-4 uppercase tracking-wider transition border-l border-zinc-700 pl-2 md:pl-4">SALIR</button>
                ) : (
                  <button onClick={() => setShowAuth(true)} className="bg-amber-600 text-white px-5 py-2 rounded-lg font-bold hover:bg-amber-500 transition shadow-lg">Entrar</button>
                )}
@@ -390,7 +360,7 @@ function App() {
 
       <main className="pt-20 pb-12">
         <Routes>
-          {/* RUTA CATALOGO (HOME) */}
+          {/* CATALOGO */}
           <Route path="/" element={
              <>
                {search.length > 0 ? (
@@ -400,7 +370,7 @@ function App() {
                            <select className="premium-input" onChange={e=>setCategory(e.target.value)}><option value="all">Todas</option><option value="Café en Grano">Grano</option><option value="Café Molido">Molido</option><option value="Accesorios">Accesorios</option></select>
                        </div>
                        <h2 className="text-2xl font-serif text-white mb-6">Resultados para "{search}"</h2>
-                       {filteredProducts.length === 0 ? <p className="text-zinc-500">Sin resultados.</p> : <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-8">{filteredProducts.map(p => <ProductCard key={p.id} product={p} onClick={() => navigate(`/product/${p.id}`)} onAdd={addToCart} onBuy={buyNow} isLiked={wishlist.find(w=>w.id===p.id)} onLike={toggleWishlist} isAdmin={user?.role === 'admin'} onDelete={handleDeleteProduct} />)}</div>}
+                       {filteredProducts.length === 0 ? <p className="text-zinc-500">Sin resultados.</p> : <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-8">{filteredProducts.map(p => <ProductCard key={p.id} product={p} onClick={() => navigate(`/product/${p.id}`)} onAdd={addToCart} onBuy={buyNow} isLiked={wishlist.find(w=>w.id===p.id)} onLike={toggleWishlist} />)}</div>}
                    </div>
                ) : (
                    <>
@@ -425,44 +395,44 @@ function App() {
                                        <div className="h-px bg-amber-900/30 flex-1"></div>
                                    </h2>
                                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-8">
-                                       {recommendations.map(p => <ProductCard key={p.id} product={p} onClick={() => navigate(`/product/${p.id}`)} onAdd={addToCart} onBuy={buyNow} isLiked={wishlist.find(w=>w.id===p.id)} onLike={toggleWishlist} recommended={true} isAdmin={user?.role === 'admin'} onDelete={handleDeleteProduct} />)}
+                                       {recommendations.map(p => <ProductCard key={p.id} product={p} onClick={() => navigate(`/product/${p.id}`)} onAdd={addToCart} onBuy={buyNow} isLiked={wishlist.find(w=>w.id===p.id)} onLike={toggleWishlist} recommended={true} />)}
                                    </div>
                                </section>
                            )}
                            
-                           <section><h2 className="text-2xl font-serif text-amber-500 mb-6 flex items-center gap-4 italic">Nuestra colección completa <div className="h-px bg-zinc-800 flex-1"></div></h2><div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-8">{filteredProducts.map(p => <ProductCard key={p.id} product={p} onClick={() => navigate(`/product/${p.id}`)} onAdd={addToCart} onBuy={buyNow} isLiked={wishlist.find(w=>w.id===p.id)} onLike={toggleWishlist} isAdmin={user?.role === 'admin'} onDelete={handleDeleteProduct} />)}</div></section>
+                           <section><h2 className="text-2xl font-serif text-amber-500 mb-6 flex items-center gap-4 italic">Nuestra colección completa <div className="h-px bg-zinc-800 flex-1"></div></h2><div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-8">{filteredProducts.map(p => <ProductCard key={p.id} product={p} onClick={() => navigate(`/product/${p.id}`)} onAdd={addToCart} onBuy={buyNow} isLiked={wishlist.find(w=>w.id===p.id)} onLike={toggleWishlist} />)}</div></section>
                        </div>
                    </>
                )}
              </>
           } />
 
-          {/* RUTA DETALLE PRODUCTO */}
+          {/* DETALLE */}
           <Route path="/product/:id" element={<ProductDetailWrapper products={products} addToCart={addToCart} buyNow={buyNow} toggleWishlist={toggleWishlist} wishlist={wishlist} />} />
           
-          {/* RUTA CARRITO (Página dedicada para tener URL propia) */}
+          {/* CARRITO */}
           <Route path="/cart" element={
               <div className="max-w-4xl mx-auto px-4 mt-10">
                  <h2 className="text-3xl font-serif text-amber-500 mb-8">Tu Cesta</h2>
                  {cart.length === 0 ? <p className="text-zinc-500 text-center">Tu cesta está vacía.</p> : (
                     <div className="space-y-4">
                         {cart.map(i => (
-                            <div key={i.id} className="flex justify-between bg-zinc-900 p-6 rounded-xl border border-zinc-800 items-center">
-                                <div className="flex gap-4 items-center">
+                            <div key={i.id} className="flex flex-col md:flex-row justify-between bg-zinc-900 p-6 rounded-xl border border-zinc-800 items-center gap-4">
+                                <div className="flex gap-4 items-center w-full md:w-auto">
                                    <img src={i.image_url} className="w-16 h-16 object-cover rounded" />
-                                   <div><h4 className="font-bold text-white">{i.name}</h4><p className="text-amber-500">{i.price}€</p></div>
+                                   <div><h4 className="font-bold text-white line-clamp-1">{i.name}</h4><p className="text-amber-500">{i.price}€</p></div>
                                 </div>
-                                <div className="flex gap-4 items-center">
+                                <div className="flex gap-4 items-center w-full md:w-auto justify-between">
                                    <div className="flex gap-2 bg-zinc-950 rounded-lg p-1 border border-zinc-800"><button onClick={()=>removeFromCart(i)} className="text-zinc-400 hover:text-white px-2">-</button><span className="text-white px-2">{i.qty}</span><button onClick={()=>addToCart(i)} className="text-zinc-400 hover:text-white px-2">+</button></div>
                                    <span className="font-bold text-white">{(i.price * i.qty).toFixed(2)}€</span>
                                 </div>
                             </div>
                         ))}
                         <div className="flex justify-end mt-8 border-t border-zinc-800 pt-8">
-                             <div className="text-right">
+                             <div className="text-right w-full md:w-auto">
                                 <p className="text-zinc-400 mb-2">Total</p>
                                 <p className="text-4xl font-serif text-amber-500 font-bold mb-6">{cartTotal.toFixed(2)}€</p>
-                                <button onClick={() => { if(!user){setShowAuth(true)}else{navigate('/checkout')} }} className="bg-amber-600 text-black px-8 py-3 rounded-xl font-bold hover:bg-amber-500">Tramitar Pedido</button>
+                                <button onClick={() => { if(!user){setShowAuth(true)}else{navigate('/checkout')} }} className="bg-amber-600 text-black px-8 py-3 w-full rounded-xl font-bold hover:bg-amber-500">Tramitar Pedido</button>
                              </div>
                         </div>
                     </div>
@@ -470,7 +440,7 @@ function App() {
               </div>
           } />
 
-          {/* RUTA WISHLIST (Página dedicada) */}
+          {/* WISHLIST */}
           <Route path="/wishlist" element={
               <div className="max-w-4xl mx-auto px-4 mt-10">
                  <h2 className="text-3xl font-serif text-amber-500 mb-8">Tus Favoritos</h2>
@@ -491,7 +461,7 @@ function App() {
               </div>
           } />
 
-          {/* RUTA CHECKOUT */}
+          {/* CHECKOUT */}
           <Route path="/checkout" element={
              <div className="max-w-7xl mx-auto px-4 mt-10 animate-fade-in pb-20">
                <h2 className="text-3xl font-serif font-bold text-amber-500 mb-8 text-center">Finalizar Pedido</h2>
@@ -517,7 +487,6 @@ function App() {
                                            <div className="flex items-center gap-3">
                                                <span className="text-2xl">💳</span>
                                                <span className="text-white font-mono">**** **** **** {card.last4}</span>
-                                               <span className="text-xs bg-zinc-800 px-2 py-1 rounded text-zinc-400">{card.brand}</span>
                                            </div>
                                            <span className="text-amber-500 font-bold text-sm">Seleccionada</span>
                                        </div>
@@ -564,7 +533,7 @@ function App() {
                                </div>
                            </div>
                            <div className="flex gap-3 flex-col">
-                               <button type="submit" form="checkout-form" className="w-full bg-gradient-to-r from-amber-600 to-yellow-500 text-black font-bold py-4 rounded-xl hover:opacity-90 transition transform active:scale-95 shadow-lg">PAGAR AHORA</button>
+                               <button type="submit" form="checkout-form" className="w-full bg-gradient-to-r from-amber-600 to-yellow-500 text-black font-bold py-4 rounded-xl hover:opacity-90 transition shadow-lg">PAGAR AHORA</button>
                                <button onClick={() => navigate('/')} className="w-full text-zinc-500 hover:text-white py-2 transition text-sm">Cancelar</button>
                            </div>
                        </div>
@@ -573,7 +542,7 @@ function App() {
              </div>
           } />
 
-          {/* RUTA ADMIN */}
+          {/* ADMIN */}
           <Route path="/admin" element={
             <div className="animate-fade-in max-w-7xl mx-auto px-4 mt-10 pb-20">
               <h2 className="text-3xl font-serif font-bold text-white mb-8 border-b border-zinc-800 pb-4">Dashboard Admin</h2>
@@ -586,45 +555,59 @@ function App() {
                     <h3 className="text-xl font-bold text-white">Inteligencia Artificial</h3>
                   </div>
                   <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                    <div className="bg-black/30 p-4 rounded-xl">
-                      <p className="text-indigo-300 text-xs uppercase font-bold">Hora Pico</p>
-                      <p className="text-2xl text-white">{aiInsights.hora_pico_ventas}:00 hs</p>
-                    </div>
-                    <div className="bg-black/30 p-4 rounded-xl">
-                      <p className="text-purple-300 text-xs uppercase font-bold">Conversión</p>
-                      <p className="text-2xl text-white">{aiInsights.tasa_conversion}%</p>
-                    </div>
-                    <div className="bg-black/30 p-4 rounded-xl">
-                      <p className="text-emerald-300 text-xs uppercase font-bold">Consejo IA</p>
-                      <p className="text-sm text-white italic">"{aiInsights.consejo_ia}"</p>
-                    </div>
+                    <div className="bg-black/30 p-4 rounded-xl"><p className="text-indigo-300 text-xs uppercase font-bold">Hora Pico</p><p className="text-2xl text-white">{aiInsights.hora_pico_ventas}:00 hs</p></div>
+                    <div className="bg-black/30 p-4 rounded-xl"><p className="text-purple-300 text-xs uppercase font-bold">Conversión</p><p className="text-2xl text-white">{aiInsights.tasa_conversion}%</p></div>
+                    <div className="bg-black/30 p-4 rounded-xl"><p className="text-emerald-300 text-xs uppercase font-bold">Consejo IA</p><p className="text-sm text-white italic">"{aiInsights.consejo_ia}"</p></div>
                   </div>
                 </div>
               )}
 
-              <div className="grid lg:grid-cols-3 gap-8 mb-8">
-                  <div className="lg:col-span-2">
-                      <SalesChart orders={orders} />
-                  </div>
-                  <div className="grid grid-rows-1 gap-4">
-                      <div className="bg-zinc-900 p-6 rounded-2xl border border-zinc-800 flex flex-col justify-center">
-                          <h4 className="text-zinc-400 text-sm font-bold uppercase tracking-wider mb-2">Pedidos Totales</h4>
-                          <p className="text-3xl font-serif text-white">{orders.length}</p>
-                      </div>
-                  </div>
+              {/* RESÚMENES FINANCIEROS (NUEVO) */}
+              <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
+                 <div className="bg-zinc-900 p-5 rounded-2xl border border-zinc-800"><p className="text-zinc-400 text-xs uppercase font-bold mb-1">Hoy</p><p className="text-2xl font-serif text-white">{salesToday.toFixed(2)}€</p></div>
+                 <div className="bg-zinc-900 p-5 rounded-2xl border border-zinc-800"><p className="text-zinc-400 text-xs uppercase font-bold mb-1">Esta Semana</p><p className="text-2xl font-serif text-white">{salesWeek.toFixed(2)}€</p></div>
+                 <div className="bg-zinc-900 p-5 rounded-2xl border border-zinc-800"><p className="text-zinc-400 text-xs uppercase font-bold mb-1">Este Mes</p><p className="text-2xl font-serif text-white">{salesMonth.toFixed(2)}€</p></div>
+                 <div className="bg-amber-900/20 p-5 rounded-2xl border border-amber-500/30"><p className="text-amber-500/80 text-xs uppercase font-bold mb-1">Este Año</p><p className="text-2xl font-serif text-amber-500">{salesYear.toFixed(2)}€</p></div>
               </div>
+
+              <div className="mb-8"><SalesChart orders={orders} /></div>
               
+              {/* GESTIÓN DE INVENTARIO (NUEVO) */}
+              <h3 className="text-2xl font-bold mb-4 text-white">📦 Gestión de Inventario</h3>
+              <div className="bg-zinc-900 rounded-2xl border border-zinc-800 overflow-x-auto mb-12">
+                <table className="w-full text-left text-sm text-zinc-400 min-w-[600px]">
+                  <thead className="bg-zinc-950 text-zinc-300 font-bold border-b border-zinc-800">
+                    <tr><th className="p-4">Producto</th><th className="p-4">Categoría</th><th className="p-4">Precio</th><th className="p-4">Stock</th><th className="p-4 text-right">Acciones</th></tr>
+                  </thead>
+                  <tbody>
+                    {products.map(p => (
+                      <tr key={p.id} className="border-b border-zinc-800/50 hover:bg-zinc-800/30 transition">
+                        <td className="p-4 flex items-center gap-3"><img src={p.image_url} className="w-10 h-10 rounded object-cover" /><span className="text-white font-bold">{p.name}</span></td>
+                        <td className="p-4">{p.category}</td>
+                        <td className="p-4">{p.price}€</td>
+                        <td className="p-4">
+                           <div className="flex items-center gap-2">
+                              <input type="number" defaultValue={p.stock} id={`stock-${p.id}`} className="bg-zinc-950 border border-zinc-700 rounded px-2 py-1 w-20 text-white outline-none focus:border-amber-500" />
+                              <button onClick={() => handleUpdateStock(p.id, document.getElementById(`stock-${p.id}`).value)} className="text-amber-500 hover:text-amber-400 font-bold px-2 py-1 bg-amber-500/10 rounded">Guardar</button>
+                           </div>
+                        </td>
+                        <td className="p-4 text-right">
+                           <button onClick={() => handleDeleteProduct(p.id)} className="text-red-500 hover:bg-red-500 hover:text-white px-3 py-1 rounded transition border border-red-500/30 bg-red-900/10">Borrar</button>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+
+              {/* AÑADIR PRODUCTOS Y ENVÍOS */}
               <div className="grid lg:grid-cols-2 gap-8">
                   <div className="bg-zinc-900 p-6 rounded-2xl border border-zinc-800">
                      <h3 className="text-xl font-bold mb-4 text-amber-500">Pedidos a Enviar</h3>
                      <div className="space-y-4 max-h-[400px] overflow-y-auto pr-2 custom-scrollbar">
                        {orders.filter(o => o.status === 'pending').map(order => (
                           <div key={order.id} className="p-4 bg-black/40 rounded-xl border border-zinc-800 flex justify-between items-center">
-                             <div>
-                                <p className="text-white font-bold">Pedido #{order.id}</p>
-                                <p className="text-sm text-zinc-400">{order.items_summary || order.items}</p>
-                                <p className="text-xs text-zinc-500 italic">{order.user_email || order.user} - {order.address}</p>
-                             </div>
+                             <div><p className="text-white font-bold">Pedido #{order.id}</p><p className="text-sm text-zinc-400">{order.items_summary || order.items}</p><p className="text-xs text-zinc-500 italic">{order.user_email || order.user} - {order.address}</p></div>
                              <button onClick={() => handleShipOrder(order.id)} className="bg-amber-600 text-black px-4 py-2 rounded-lg font-bold hover:bg-amber-500 transition">Completar</button>
                           </div>
                        ))}
@@ -655,8 +638,8 @@ function App() {
   );
 }
 
-// --- COMPONENTS EXTRA ---
-function ProductCard({ product, onClick, onAdd, onBuy, recommended, isLiked, onLike, isAdmin, onDelete }) {
+// --- COMPONENTS EXTRA (Sin botón borrar) ---
+function ProductCard({ product, onClick, onAdd, onBuy, recommended, isLiked, onLike }) {
     return (
         <div className={`group bg-zinc-900/40 rounded-3xl overflow-hidden border transition-all duration-500 hover:bg-zinc-900/80 ${recommended ? 'border-amber-500/30 shadow-[0_0_15px_rgba(245,158,11,0.1)]' : 'border-zinc-800'}`}>
             <div className="relative h-72 overflow-hidden cursor-pointer" onClick={onClick}>
@@ -664,11 +647,6 @@ function ProductCard({ product, onClick, onAdd, onBuy, recommended, isLiked, onL
                 <button onClick={(e) => { e.stopPropagation(); onLike(product); }} className="absolute top-4 right-4 text-2xl drop-shadow-lg transition hover:scale-125 z-20">
                     {isLiked ? <span className="text-amber-500">♥</span> : <span className="text-zinc-300">♡</span>}
                 </button>
-                {isAdmin && (
-                  <button onClick={(e) => { e.stopPropagation(); onDelete(product.id); }} className="absolute top-4 left-4 bg-red-600 text-white text-xs font-bold px-2 py-1 rounded z-20 hover:bg-red-500 transition">
-                     Borrar
-                  </button>
-                )}
                 <div className="absolute bottom-0 left-0 w-full bg-gradient-to-t from-black p-6">
                     <div className="flex justify-between items-end">
                       <div>
@@ -697,25 +675,15 @@ function AuthModal({ onClose, onLogin }) {
         e.preventDefault(); setError("");
         try {
             if(isReg) {
-                const res = await fetch(`${API_BASE_URL}/users/`, { 
-                  method: 'POST', 
-                  headers: {'Content-Type': 'application/json'}, 
-                  body: JSON.stringify({email, password}) 
-                });
+                const res = await fetch(`${API_BASE_URL}/users/`, { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({email, password}) });
                 if(!res.ok) throw new Error("Error registrando usuario");
                 alert("Cuenta creada."); setIsReg(false);
             } else {
-                const form = new URLSearchParams(); 
-                form.append('username', email); 
-                form.append('password', password);
-                const res = await fetch(`${API_BASE_URL}/token`, { 
-                  method: 'POST', headers: {'Content-Type': 'application/x-www-form-urlencoded'}, body: form 
-                });
+                const form = new URLSearchParams(); form.append('username', email); form.append('password', password);
+                const res = await fetch(`${API_BASE_URL}/token`, { method: 'POST', headers: {'Content-Type': 'application/x-www-form-urlencoded'}, body: form });
                 if(!res.ok) throw new Error("Credenciales inválidas");
                 const data = await res.json();
-                const userRole = data.role || 'client'; 
-                const loggedUser = { email: email, id: data.user_id, role: userRole, token: data.access_token };
-                onLogin(loggedUser);
+                onLogin({ email: email, id: data.user_id, role: data.role || 'client', token: data.access_token });
             }
         } catch(err) { setError(err.message); }
     };

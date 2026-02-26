@@ -9,6 +9,7 @@ from database import engine, get_db
 import smtplib
 from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
+from pydantic import BaseModel
 
 # --- NUEVAS IMPORTACIONES PARA AUTOMATIZACIÓN E IA ---
 
@@ -408,9 +409,23 @@ def get_admin_orders(db: Session = Depends(get_db), admin: models.User = Depends
         "status": o.status
     } for o in orders]
 
+class StockUpdate(BaseModel):
+    stock: int
+
+@app.put("/admin/products/{product_id}/stock", tags=["Admin"])
+def update_product_stock(product_id: int, data: StockUpdate, admin: models.User = Depends(check_admin), db: Session = Depends(get_db)):
+    """Actualiza el stock de un producto manualmente desde el panel de admin"""
+    product = db.query(models.Product).filter(models.Product.id == product_id).first()
+    if not product:
+        raise HTTPException(status_code=404, detail="Producto no encontrado")
+    
+    product.stock = data.stock
+    db.commit()
+    db.refresh(product)
+    return product
 
 
-from pydantic import BaseModel
+
 
 class InteractionSchema(BaseModel):
     product_id: int = None
@@ -426,6 +441,8 @@ def track_interaction(interaction: InteractionSchema, user_id: int = None, db: S
     db.add(db_interaction)
     db.commit()
     return {"status": "tracked"}
+
+
 
 # Al final de backend/main.py
 @app.get("/admin/ai-insights", tags=["Admin"])
