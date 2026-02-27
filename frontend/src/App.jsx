@@ -4,35 +4,24 @@ import { Routes, Route, Link, useNavigate, useParams, useLocation } from 'react-
 // --- CONFIGURACIÓN DE URL ---
 const API_BASE_URL = 'https://grano-oro-api.onrender.com';
 
-// Función externa para que ESLint no se queje de inmutabilidad en React
+// 1. FUNCIÓN FUERA (Sin cambios, para evitar errores de inmutabilidad)
 const setLanguageCookie = (langCode) => {
+  const domain = window.location.hostname;
   if (langCode === 'es') {
     document.cookie = `googtrans=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/;`;
-    document.cookie = `googtrans=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/; domain=.${window.location.hostname}`;
+    document.cookie = `googtrans=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/; domain=.${domain}`;
   } else {
     document.cookie = `googtrans=/es/${langCode}; path=/;`;
-    document.cookie = `googtrans=/es/${langCode}; path=/; domain=.${window.location.hostname}`;
+    document.cookie = `googtrans=/es/${langCode}; path=/; domain=.${domain}`;
   }
   window.location.reload(); 
 };
 
-// --- NUEVO TRADUCTOR (Botón con Banderas Reales en Imágenes) ---
+// 2. COMPONENTE CORREGIDO (Sin useEffect para evitar el error de renderizado en cascada)
 const LanguageSelector = () => {
   const [isOpen, setIsOpen] = useState(false);
-  
-  const getCookie = (name) => {
-    const value = `; ${document.cookie}`;
-    const parts = value.split(`; ${name}=`);
-    if (parts.length === 2) {
-      // Usamos decodeURIComponent porque a veces el navegador guarda la '/' como '%2F'
-      return decodeURIComponent(parts.pop().split(';').shift());
-    }
-    return null;
-  };
 
-  const currentLangCookie = getCookie('googtrans')?.split('/').pop() || 'es';
-
-  // Usamos imágenes SVG reales de FlagCDN para que Windows no muestre letras
+  // Definimos los idiomas aquí dentro para usarlos en la inicialización del estado
   const languages = [
     { code: 'es', flag: 'https://flagcdn.com/es.svg', name: 'Español' },
     { code: 'en', flag: 'https://flagcdn.com/gb.svg', name: 'English' },
@@ -42,15 +31,26 @@ const LanguageSelector = () => {
     { code: 'zh-CN', flag: 'https://flagcdn.com/cn.svg', name: '中文' }
   ];
 
-  const currentLang = languages.find(l => l.code === currentLangCookie) || languages[0];
+  // LEEMOS LA COOKIE DIRECTAMENTE EN EL ESTADO INICIAL
+  const [currentLangCode] = useState(() => {
+    const name = 'googtrans';
+    const value = `; ${document.cookie}`;
+    const parts = value.split(`; ${name}=`);
+    if (parts.length === 2) {
+      const cookieVal = decodeURIComponent(parts.pop().split(';').shift());
+      return cookieVal.split('/').pop() || 'es';
+    }
+    return 'es';
+  });
+
+  const currentLang = languages.find(l => l.code === currentLangCode) || languages[0];
 
   return (
     <div className="relative mr-2 md:mr-4 flex items-center">
-      {/* EL BOTÓN CON LA BANDERA ACTUAL PERFECTAMENTE CENTRADA */}
+      {/* BOTÓN PRINCIPAL */}
       <button 
         onClick={() => setIsOpen(!isOpen)}
         className="flex items-center justify-center w-10 h-10 rounded-full bg-zinc-900 border border-zinc-700 hover:border-amber-500 transition-all shadow-lg overflow-hidden"
-        title="Cambiar idioma"
       >
         <img 
           src={currentLang.flag} 
@@ -59,7 +59,7 @@ const LanguageSelector = () => {
         />
       </button>
       
-      {/* EL MENÚ DESPLEGABLE CON LAS OPCIONES */}
+      {/* DESPLEGABLE */}
       {isOpen && (
         <div className="absolute top-12 right-0 bg-zinc-900 border border-zinc-700 rounded-xl shadow-2xl py-2 w-40 z-50 animate-fade-in">
           {languages.map(lang => (
@@ -69,7 +69,7 @@ const LanguageSelector = () => {
                 setIsOpen(false);
                 setLanguageCookie(lang.code);
               }}
-              className={`w-full text-left px-4 py-2 hover:bg-zinc-800 transition flex items-center gap-3 ${currentLang.code === lang.code ? 'text-amber-500 font-bold bg-zinc-800/50' : 'text-zinc-300'}`}
+              className={`w-full text-left px-4 py-2 hover:bg-zinc-800 transition flex items-center gap-3 ${currentLangCode === lang.code ? 'text-amber-500 font-bold bg-zinc-800/50' : 'text-zinc-300'}`}
             >
               <img src={lang.flag} alt={lang.name} className="w-5 h-5 object-cover rounded-full" />
               <span className="text-sm">{lang.name}</span>
@@ -78,28 +78,13 @@ const LanguageSelector = () => {
         </div>
       )}
       
-      {/* Escondemos el widget original */}
       <div id="google_translate_element" className="hidden"></div>
       
-      {/* DESTRUCTOR DE LA BARRA BLANCA DE GOOGLE */}
       <style>{`
-        .goog-te-banner-frame.skiptranslate,
-        .skiptranslate > iframe {
-            display: none !important;
-        }
-        body {
-            top: 0px !important; 
-            position: static !important;
-        }
-        #goog-gt-tt, .goog-te-balloon-frame {
-            display: none !important;
-        }
-        font {
-            background: transparent !important;
-        }
-        .VIpgJd-ZVi9od-ORHb-OEVmcd {
-            display: none !important;
-        }
+        .goog-te-banner-frame.skiptranslate, .skiptranslate > iframe, .VIpgJd-ZVi9od-ORHb-OEVmcd { display: none !important; }
+        body { top: 0px !important; position: static !important; }
+        #goog-gt-tt, .goog-te-balloon-frame { display: none !important; }
+        font { background: transparent !important; }
       `}</style>
     </div>
   );
