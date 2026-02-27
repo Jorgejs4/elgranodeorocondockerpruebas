@@ -5,44 +5,41 @@ import { Routes, Route, Link, useNavigate, useParams, useLocation } from 'react-
 const API_BASE_URL = 'https://grano-oro-api.onrender.com';
 
 // 1. FUNCIÓN FUERA (Sin cambios, para evitar errores de inmutabilidad)
-const setLanguageCookie = (langCode) => {
+
+/* ===============================
+   LEER COOKIE GOOGLE
+const getCurrentLanguage = () => {
+  const match = document.cookie.match(/(^| )googtrans=([^;]+)/);
+
+  if (!match) return "es";
+
+  const value = decodeURIComponent(match[2]);
+  return value.split("/").pop() || "es";
+};
+
+/* ===============================
+   CAMBIAR IDIOMA
+================================= */
+const setLanguageCookie = (langCode, setLang) => {
   const domain = window.location.hostname;
 
   if (langCode === "es") {
-    // eliminar traducción
     document.cookie =
       "googtrans=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/;";
     document.cookie =
       `googtrans=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/; domain=.${domain}`;
   } else {
-    // establecer idioma
     document.cookie = `googtrans=/es/${langCode}; path=/;`;
     document.cookie = `googtrans=/es/${langCode}; path=/; domain=.${domain}`;
   }
 
-  // pequeño delay para asegurar escritura de cookie
+  // ✅ actualiza bandera inmediatamente
+  setLang(langCode);
+
+  // pequeño delay para asegurar cookie
   setTimeout(() => {
     window.location.reload();
-  }, 100);
-};
-
-/* ===============================
-   LEER IDIOMA ACTUAL DESDE COOKIE
-================================= */
-const getCurrentLanguage = () => {
-  const name = "googtrans";
-  const value = `; ${document.cookie}`;
-  const parts = value.split(`; ${name}=`);
-
-  if (parts.length === 2) {
-    const cookieVal = decodeURIComponent(
-      parts.pop().split(";").shift()
-    );
-
-    return cookieVal.split("/").pop() || "es";
-  }
-
-  return "es";
+  }, 120);
 };
 
 /* ===============================
@@ -51,25 +48,27 @@ const getCurrentLanguage = () => {
 const LanguageSelector = () => {
   const [isOpen, setIsOpen] = useState(false);
 
+  // ✅ inicialización correcta (sin useEffect)
+  const [currentLangCode, setCurrentLangCode] = useState(() =>
+    getCurrentLanguage()
+  );
+
   const languages = [
     { code: "es", flag: "https://flagcdn.com/es.svg", name: "Español" },
     { code: "en", flag: "https://flagcdn.com/gb.svg", name: "English" },
     { code: "fr", flag: "https://flagcdn.com/fr.svg", name: "Français" },
     { code: "de", flag: "https://flagcdn.com/de.svg", name: "Deutsch" },
     { code: "it", flag: "https://flagcdn.com/it.svg", name: "Italiano" },
-    { code: "zh-CN", flag: "https://flagcdn.com/cn.svg", name: "中文" },
+    { code: "zh-CN", flag: "https://flagcdn.com/cn.svg", name: "中文" }
   ];
 
-  // 🔥 SIEMPRE lee la cookie actual
-  const currentLangCode = getCurrentLanguage();
-
   const currentLang =
-    languages.find((l) => l.code === currentLangCode) ||
+    languages.find(l => l.code === currentLangCode) ||
     languages[0];
 
   return (
     <div className="relative mr-2 md:mr-4 flex items-center">
-      
+
       {/* BOTÓN PRINCIPAL */}
       <button
         onClick={() => setIsOpen(!isOpen)}
@@ -82,15 +81,15 @@ const LanguageSelector = () => {
         />
       </button>
 
-      {/* MENU DESPLEGABLE */}
+      {/* DESPLEGABLE */}
       {isOpen && (
-        <div className="absolute top-12 right-0 bg-zinc-900 border border-zinc-700 rounded-xl shadow-2xl py-2 w-40 z-50 animate-fade-in">
-          {languages.map((lang) => (
+        <div className="absolute top-12 right-0 bg-zinc-900 border border-zinc-700 rounded-xl shadow-2xl py-2 w-40 z-50">
+          {languages.map(lang => (
             <button
               key={lang.code}
               onClick={() => {
                 setIsOpen(false);
-                setLanguageCookie(lang.code);
+                setLanguageCookie(lang.code, setCurrentLangCode);
               }}
               className={`w-full text-left px-4 py-2 hover:bg-zinc-800 transition flex items-center gap-3 ${
                 currentLangCode === lang.code
@@ -109,7 +108,7 @@ const LanguageSelector = () => {
         </div>
       )}
 
-      {/* GOOGLE TRANSLATE */}
+      {/* GOOGLE TRANSLATE ELEMENT */}
       <div id="google_translate_element" className="hidden"></div>
 
       {/* OCULTAR UI GOOGLE */}
@@ -134,6 +133,7 @@ const LanguageSelector = () => {
           background: transparent !important;
         }
       `}</style>
+
     </div>
   );
 };
