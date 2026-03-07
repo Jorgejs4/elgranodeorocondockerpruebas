@@ -255,12 +255,12 @@ def seed_ai_data(admin: models.User = Depends(check_admin), db: Session = Depend
     
     # Generar 200 interacciones (Vistas, carritos, compras)
     actions = ["view", "add_to_cart", "purchase"]
-    for _ in range(200):
+    for _ in range(2000):
         inter = models.Interaction(user_id=admin.id, product_id=random.choice(products).id, action_type=random.choice(actions))
         db.add(inter)
         
     # Generar 50 pedidos históricos repartidos en el último año
-    for i in range(50):
+    for i in range(500):
         d = datetime.utcnow() - timedelta(days=random.randint(0, 365), hours=random.randint(0,23))
         order = models.Order(
             user_email=admin.email, total=round(random.uniform(15.0, 150.0), 2),
@@ -269,6 +269,7 @@ def seed_ai_data(admin: models.User = Depends(check_admin), db: Session = Depend
         )
         db.add(order)
     db.commit()
+    ml_core.train_model(db)
     return {"message": "Datos inyectados. ¡La IA ya tiene comida!"}
 
 @app.get("/admin/ai-insights", tags=["Admin"])
