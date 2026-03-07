@@ -340,9 +340,13 @@ function App() {
             })
         });
 
-        if (!response.ok) throw new Error("Error procesando pago");
-        await response.json(); 
+        // --- CAMBIO CLAVE AQUÍ ---
+        if (!response.ok) {
+            const errorData = await response.json().catch(() => ({}));
+            throw new Error(errorData.detail || "Error interno del servidor (500)");
+        }
         
+        await response.json(); 
         alert(`🎉 ¡Pedido confirmado y stock actualizado!`);
         setCart([]); navigate("/"); window.scrollTo(0,0);
         
@@ -350,7 +354,10 @@ function App() {
         const updatedProds = await resProd.json();
         setProducts(updatedProds);
 
-    } catch (err) { console.error(err); alert("Hubo un problema con la transacción."); }
+    } catch (err) { 
+        console.error("Error real:", err); 
+        alert(`Fallo en la compra: ${err.message}`); // Ahora verás el error de verdad
+    }
   };
 
   // Cálculos de ventas
