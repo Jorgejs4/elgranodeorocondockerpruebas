@@ -3,57 +3,53 @@ from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy.orm import Session
 from fastapi.security import OAuth2PasswordBearer, OAuth2PasswordRequestForm
 from typing import List, Optional, Any
-from pydantic import BaseModel # Necesario para los esquemas del checkout
+from pydantic import BaseModel
 import models, schemas, crud, security
 from database import engine, get_db
 import smtplib
 from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
 
-# --- NUEVAS IMPORTACIONES PARA AUTOMATIZACIÓN E IA ---
 import pandas as pd
 from datetime import datetime
 from apscheduler.schedulers.background import BackgroundScheduler
-import ml_core # Tu módulo de IA existente
+import ml_core
 
-# Crear tablas del sistema principal (Usuarios, Productos)
+# Crear tablas
 models.Base.metadata.create_all(bind=engine)
 
 app = FastAPI(title="API El Grano de Oro", description="Gestión de tienda, usuarios e IA Automática")
 
-# Lista de orígenes permitidos
+# --- SOLUCIÓN AL ERROR 500 Y CORS ---
 origins = [
-    "https://elgranodeorocondockerpruebas.onrender.com", # Tu frontend actual
-    "http://localhost:5173",                           # Para que sigas pudiendo probar en local
-    "http://localhost:3000",
+    "http://localhost:5173",  # Para cuando programas en tu PC
+    "https://elgranodeorocondockerpruebas.onrender.com", # Tu frontend online
 ]
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=origins, # <--- Aquí es donde sucede la magia
+    allow_origins=origins, # Ya no usamos "*"
     allow_credentials=True,
-    allow_methods=["*"],   # Permite GET, POST, OPTIONS, etc.
-    allow_headers=["*"],   # Permite todos los headers
+    allow_methods=["*"],
+    allow_headers=["*"],
 )
 
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="token")
 
-# --- SCHEDULER: EL RELOJ AUTOMÁTICO ---
+# --- SCHEDULER ---
 def scheduled_retrain_job():
     print("🔄 [AUTO-SCHEDULER] Ejecutando reentrenamiento semanal...")
     try:
-        # Aquí llamamos a tu lógica de entrenamiento
         ml_core.train_model() 
         print("✅ [AUTO-SCHEDULER] Modelo actualizado correctamente.")
     except Exception as e:
         print(f"❌ [AUTO-SCHEDULER] Error entrenando: {e}")
 
 scheduler = BackgroundScheduler()
-# Configurado para ejecutarse cada 1 semana. 
 scheduler.add_job(scheduled_retrain_job, 'interval', weeks=1)
 scheduler.start()
 
-# --- ESQUEMAS PARA CHECKOUT (Pydantic) ---
+# --- ESQUEMAS PARA CHECKOUT ---
 class OrderItemSchema(BaseModel):
     id: int
     name: str
@@ -65,6 +61,13 @@ class OrderSchema(BaseModel):
     total: float
     items: List[OrderItemSchema]
     address: str
+
+class InteractionSchema(BaseModel):
+    product_id: int = None
+    action_type: str
+
+class StockUpdate(BaseModel):
+    stock: int
 
 # --- DEPENDENCIAS DE SEGURIDAD ---
 def get_current_user(token: str = Depends(oauth2_scheme), db: Session = Depends(get_db)):
@@ -106,7 +109,6 @@ def login(form_data: OAuth2PasswordRequestForm = Depends(), db: Session = Depend
         raise HTTPException(status_code=400, detail="Credenciales incorrectas")
     
     access_token = security.create_access_token(data={"sub": str(user.id)})
-    
     return {
         "access_token": access_token, 
         "token_type": "bearer",
@@ -114,20 +116,6 @@ def login(form_data: OAuth2PasswordRequestForm = Depends(), db: Session = Depend
         "user_id": user.id,
         "email": user.email
     }
-
-# --- GESTIÓN DE USUARIOS ---
-@app.get("/users/", response_model=List[schemas.UserResponse], tags=["Usuarios"])
-def read_users(skip: int = 0, limit: int = 100, db: Session = Depends(get_db)):
-    return db.query(models.User).offset(skip).limit(limit).all()
-
-@app.delete("/users/{user_id}", tags=["Usuarios"])
-def delete_user(user_id: int, db: Session = Depends(get_db), admin: models.User = Depends(check_admin)):
-    user = db.query(models.User).filter(models.User.id == user_id).first()
-    if not user:
-        raise HTTPException(status_code=404, detail="Usuario no encontrado")
-    db.delete(user)
-    db.commit()
-    return {"message": "Usuario eliminado"}
 
 # --- GESTIÓN DE PRODUCTOS ---
 @app.get("/products/", response_model=List[schemas.ProductResponse], tags=["Productos"])
@@ -143,54 +131,51 @@ def delete_product(product_id: int, db: Session = Depends(get_db)):
     product = db.query(models.Product).filter(models.Product.id == product_id).first()
     if not product:
         raise HTTPException(status_code=404, detail="Producto no encontrado")
-    
     db.query(models.Interaction).filter(models.Interaction.product_id == product_id).delete()
     db.delete(product)
     db.commit()
     return {"message": "Producto eliminado"}
 
+@app.put("/admin/products/{product_id}/stock", tags=["Admin"])
+def update_product_stock(product_id: int, data: StockUpdate, admin: models.User = Depends(check_admin), db: Session = Depends(get_db)):
+    product = db.query(models.Product).filter(models.Product.id == product_id).first()
+    if not product:
+        raise HTTPException(status_code=404, detail="Producto no encontrado")
+    product.stock = data.stock
+    db.commit()
+    db.refresh(product)
+    return product
+
 # --- CHECKOUT Y PEDIDOS ---
 @app.post("/checkout", tags=["Ventas"])
 def checkout(order: OrderSchema, db: Session = Depends(get_db)):
-    """Procesa la venta: Resta stock y guarda el pedido"""
-    
-    # 1. ACTUALIZAR STOCK
     for item in order.items:
         db_product = db.query(models.Product).filter(models.Product.id == item.id).first()
-        
         if not db_product:
             raise HTTPException(status_code=404, detail=f"Producto {item.name} no encontrado")
-        
         if db_product.stock < item.qty:
             raise HTTPException(status_code=400, detail=f"Stock insuficiente para {item.name}")
-        
-        # Restamos el stock
         db_product.stock -= item.qty
-    
-    # 2. GUARDAR EL PEDIDO
+
     items_str = ", ".join([f"{i.qty}x {i.name}" for i in order.items])
     
-    new_order = models.Order(
+    db_order = models.Order(
         user_email=order.user,
         total=order.total,
         items_summary=items_str,
         address=order.address,
         status="pending",
-        date=datetime.utcnow() # <-- CRÍTICO para que no rompa el frontend
+        date=datetime.utcnow() 
     )
+    db.add(db_order)
+    db.commit()
+    db.refresh(db_order)
     
-    db.add(new_order)
-    db.commit()          
-    db.refresh(new_order) 
-    
-    return {"message": "Venta exitosa", "order_id": new_order.id}
-
+    return {"message": "Venta exitosa", "order_id": db_order.id}
 
 @app.get("/admin/orders", response_model=List[Any], tags=["Ventas"])
 def get_admin_orders(db: Session = Depends(get_db), admin: models.User = Depends(check_admin)):
-    """Permite al admin ver todos los pedidos realizados"""
     orders = db.query(models.Order).order_by(models.Order.id.desc()).all()
-    # Mapeamos para que el frontend reciba los nombres exactos que espera
     return [{
         "id": o.id,
         "user": o.user_email,
@@ -201,10 +186,8 @@ def get_admin_orders(db: Session = Depends(get_db), admin: models.User = Depends
         "status": o.status
     } for o in orders]
 
-
 @app.put("/admin/orders/{order_id}/ship", tags=["Ventas"])
 def ship_admin_order(order_id: int, admin: models.User = Depends(check_admin), db: Session = Depends(get_db)):
-    """Marca un pedido como enviado"""
     order = db.query(models.Order).filter(models.Order.id == order_id).first()
     if order:
         order.status = "shipped"
@@ -213,56 +196,9 @@ def ship_admin_order(order_id: int, admin: models.User = Depends(check_admin), d
 
 @app.delete("/admin/orders/clear", tags=["Ventas"])
 def clear_all_orders(admin: models.User = Depends(check_admin)):
-    """Limpia todo el historial de pedidos"""
     return {"message": "Historial limpiado"}
 
-@app.get("/ai-status", tags=["IA"])
-def ai_status():
-    pass
-
-# --- STOCK MANAGEMENT ---
-class StockUpdate(BaseModel):
-    stock: int
-
-@app.put("/admin/products/{product_id}/stock", tags=["Admin"])
-def update_product_stock(product_id: int, data: StockUpdate, admin: models.User = Depends(check_admin), db: Session = Depends(get_db)):
-    """Actualiza el stock manualmente"""
-    product = db.query(models.Product).filter(models.Product.id == product_id).first()
-    if not product:
-        raise HTTPException(status_code=404, detail="Producto no encontrado")
-    
-    product.stock = data.stock
-    db.commit()
-    db.refresh(product)
-    return product
-
 # --- INTERACCIONES E IA ---
-@app.post("/interactions/", response_model=schemas.InteractionResponse, tags=["Interacciones"])
-def create_interaction(interaction: schemas.InteractionCreate, db: Session = Depends(get_db)):
-    return crud.create_interaction(db=db, interaction=interaction)
-
-@app.get("/interactions/", response_model=List[schemas.InteractionResponse], tags=["Interacciones"])
-def read_interactions(skip: int = 0, limit: int = 100, db: Session = Depends(get_db)):
-    return db.query(models.Interaction).offset(skip).limit(limit).all()
-
-@app.get("/recommendations/", response_model=List[schemas.ProductResponse], tags=["IA"])
-def get_recommendations_route(user_id: Optional[int] = None, db: Session = Depends(get_db)):
-    import ml_core
-    if not user_id:
-        return db.query(models.Product).limit(4).all()
-    rec_ids = ml_core.get_recommendations(user_id, db)
-    return db.query(models.Product).filter(models.Product.id.in_(rec_ids)).all()
-
-@app.post("/train", tags=["IA"])
-def train_model(background_tasks: BackgroundTasks):
-    """Entrenamiento manual forzado (además del automático)"""
-    background_tasks.add_task(scheduled_retrain_job)
-    return {"message": "Entrenamiento iniciado en segundo plano"}  
-
-class InteractionSchema(BaseModel):
-    product_id: int = None
-    action_type: str
-
 @app.post("/track", tags=["Analytics"])
 def track_interaction(interaction: InteractionSchema, user_id: int = None, db: Session = Depends(get_db)):
     db_interaction = models.Interaction(
@@ -274,10 +210,23 @@ def track_interaction(interaction: InteractionSchema, user_id: int = None, db: S
     db.commit()
     return {"status": "tracked"}
 
+@app.get("/recommendations/", response_model=List[schemas.ProductResponse], tags=["IA"])
+def get_recommendations_route(user_id: Optional[int] = None, db: Session = Depends(get_db)):
+    import ml_core
+    if not user_id:
+        return db.query(models.Product).limit(4).all()
+    rec_ids = ml_core.get_recommendations(user_id, db)
+    return db.query(models.Product).filter(models.Product.id.in_(rec_ids)).all()
+
 @app.get("/admin/ai-insights", tags=["Admin"])
 def get_ai_insights(db: Session = Depends(get_db)):
     from ml_core import generate_business_insights
     return generate_business_insights(db)
+
+@app.post("/train", tags=["IA"])
+def train_model(background_tasks: BackgroundTasks):
+    background_tasks.add_task(scheduled_retrain_job)
+    return {"message": "Entrenamiento iniciado en segundo plano"}  
 
 # --- SISTEMA DE CORREO (MAILTRAP) ---
 MAILTRAP_USER = "5f6569de0cb0aa" 
@@ -293,22 +242,13 @@ def send_stock_alert_email(low_stock_products):
     for p in low_stock_products:
         cuerpo_items += f"• {p.name}: Quedan {p.stock} unidades\n"
 
-    cuerpo = f"""
-    Hola Administrador,
-    
-    Los siguientes productos están bajo mínimos (menos de 5 unidades):
-    
-    {cuerpo_items}
-    
-    Por favor, accede al panel de control para gestionar los pedidos.
-    """
+    cuerpo = f"Hola Administrador,\n\nLos siguientes productos están bajo mínimos:\n\n{cuerpo_items}\n\nPor favor, repón el stock."
     msg.attach(MIMEText(cuerpo, 'plain'))
 
     try:
         with smtplib.SMTP("sandbox.smtp.mailtrap.io", 2525) as server:
             server.login(MAILTRAP_USER, MAILTRAP_PASS)
             server.send_message(msg)
-        print("✅ Correo de alerta enviado a Mailtrap")
     except Exception as e:
         print(f"❌ Error enviando correo: {e}")
 
